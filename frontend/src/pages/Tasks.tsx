@@ -14,6 +14,7 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -153,6 +154,14 @@ export default function Tasks() {
     }
   };
 
+  const openAttachmentGallery = (task: any) => {
+    setSelectedTask(task);
+  };
+
+  const closeAttachmentGallery = () => {
+    setSelectedTask(null);
+  };
+
   const handleAttachmentSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !attachmentTaskId.current) return;
@@ -236,7 +245,17 @@ export default function Tasks() {
               {tasks.length === 0 ? <tr><td colSpan={7}><div className="empty-state"><h3>No tasks yet</h3><p>Create your first task</p></div></td></tr> :
                 tasks.map((t: any) => (
                   <tr key={t._id}>
-                    <td style={{ fontWeight: 600 }}>{t.title}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      <div>{t.title}</div>
+                      {t.attachments?.length ? (
+                        <div className="thumbnail-row">
+                          {t.attachments.slice(0, 3).map((attachment: any) => (
+                            <img key={attachment._id} src={attachment.fileUrl} alt={attachment.fileName} className="task-thumbnail" />
+                          ))}
+                          {t.attachments.length > 3 && <span className="thumbnail-count">+{t.attachments.length - 3}</span>}
+                        </div>
+                      ) : null}
+                    </td>
                     <td>{t.projectId?.title || '—'}</td>
                     <td><div style={{ display:'flex', alignItems:'center', gap:6 }}><div className="user-avatar" style={{ width:24, height:24, fontSize:10 }}>{t.assignedTo?.name?.charAt(0) || '?'}</div>{t.assignedTo?.name || '—'}</div></td>
                     <td><span className={`badge ${PRIORITY_BADGES[t.priority]}`}>{t.priority}</span></td>
@@ -254,7 +273,15 @@ export default function Tasks() {
                         }} disabled={uploading} title="Upload image">
                           <ImagePlus size={14} color="#2563eb" />
                         </button>
-                        {t.attachments?.length ? <span className="badge badge-gray">{t.attachments.length} image</span> : null}
+                        {t.attachments?.length ? (
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            type="button"
+                            onClick={() => openAttachmentGallery(t)}
+                          >
+                            {t.attachments.length} image{t.attachments.length > 1 ? 's' : ''}
+                          </button>
+                        ) : null}
                         <button className="btn-ghost btn-icon" onClick={() => deleteTask(t._id)}><Trash2 size={14} color="#ef4444" /></button>
                       </div>
                     </td>
@@ -303,6 +330,32 @@ export default function Tasks() {
                 {submitting ? 'Creating…' : 'Create Task'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedTask && (
+        <div className="modal-overlay" onClick={closeAttachmentGallery}>
+          <div className="modal modal-large" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">{selectedTask.title}</h3>
+                <p className="page-subtitle">{selectedTask.attachments?.length || 0} attachment{selectedTask.attachments?.length === 1 ? '' : 's'}</p>
+              </div>
+              <button className="btn-ghost" onClick={closeAttachmentGallery}>✕</button>
+            </div>
+            {selectedTask.attachments?.length ? (
+              <div className="gallery-grid">
+                {selectedTask.attachments.map((attachment: any) => (
+                  <div className="gallery-card" key={attachment._id}>
+                    <img src={attachment.fileUrl} alt={attachment.fileName} />
+                    <div className="gallery-meta">{attachment.fileName}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state"><h3>No images yet</h3><p>Upload a task image to preview it here.</p></div>
+            )}
           </div>
         </div>
       )}

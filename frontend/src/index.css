@@ -150,6 +150,15 @@ input:focus, textarea:focus, select:focus {
 .filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .filter-row select { min-width: 160px; max-width: 200px; }
 .subtitle-note { margin-top: 8px; font-size: 13px; color: var(--gray-500); }
+.thumbnail-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+.task-thumbnail { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; border: 1px solid var(--gray-200); }
+.thumbnail-count { width: 44px; height: 44px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--gray-100); color: var(--gray-600); font-size: 12px; border: 1px solid var(--gray-200); }
+.modal-large { max-width: 860px; }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 18px; }
+.gallery-card { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); transition: transform var(--transition); }
+.gallery-card:hover { transform: translateY(-2px); }
+.gallery-card img { width: 100%; aspect-ratio: 1.3 / 1; object-fit: cover; display: block; }
+.gallery-meta { padding: 12px; font-size: 13px; color: var(--gray-600); }
 
 /* ── Cards ── */
 .card {
