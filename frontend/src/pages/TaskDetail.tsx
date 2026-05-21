@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../lib/api';
-import { Clock, User, ArrowLeft, ImagePlus, LayoutDashboard } from 'lucide-react';
+import { Clock, User, ArrowLeft, ImagePlus } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 export default function TaskDetail() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
   const [task, setTask] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const { addNotification } = useAuthStore();
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!taskId) return;
@@ -20,6 +24,50 @@ export default function TaskDetail() {
       })
       .finally(() => setLoading(false));
   }, [taskId]);
+
+  const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject('Unable to read file');
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleAttachmentSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !taskId) return;
+    if (!file.type.startsWith('image/')) { alert('Please select an image file'); return; }
+    if (file.size > 5_000_000) { alert('Please choose an image smaller than 5MB.'); return; }
+
+    setUploading(true);
+    try {
+      const fileUrl = await toBase64(file);
+      await api.post(`/tasks/${taskId}/attachments`, { fileName: file.name, fileUrl, fileSize: file.size });
+      addNotification('Attachment uploaded', `Uploaded ${file.name}`);
+      const { data } = await api.get(`/tasks/${taskId}`);
+      setTask(data.data);
+    } catch (err) {
+      console.error('Upload failed', err);
+      addNotification('Attachment upload failed', 'Unable to upload attachment');
+      alert('Unable to upload attachment.');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!taskId) return;
+    if (!confirm('Delete this attachment?')) return;
+    try {
+      await api.delete(`/tasks/${taskId}/attachments/${attachmentId}`);
+      addNotification('Attachment deleted', 'Attachment removed');
+      const { data } = await api.get(`/tasks/${taskId}`);
+      setTask(data.data);
+    } catch (err) {
+      console.error('Delete attachment failed', err);
+      alert('Unable to delete attachment.');
+    }
+  };
 
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><span className="loading-spinner" /></div>;
@@ -81,19 +129,28 @@ export default function TaskDetail() {
 
         <section>
           <h3>Attachments</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleAttachmentSelect} style={{ display: 'none' }} />
+            <button className="btn btn-secondary" type="button" onClick={() => fileRef.current?.click()} disabled={uploading}><ImagePlus size={14} /> Upload image</button>
+            {uploading && <span style={{ marginLeft: 8, color: '#64748b' }}>Uploading…</span>}
+          </div>
+
           {task.attachments?.length ? (
-            <div className="gallery-grid">
+            <div className="gallery-grid" style={{ marginTop: 12 }}>
               {task.attachments.map((attachment: any) => (
-                <div className="gallery-card" key={attachment._id}>
+                <div className="gallery-card" key={attachment._id} style={{ position: 'relative' }}>
                   <a href={attachment.fileUrl} target="_blank" rel="noreferrer">
-                    <img src={attachment.fileUrl} alt={attachment.fileName} style={{ cursor: 'pointer' }} />
+                    <img src={attachment.fileUrl} alt={attachment.fileName} />
                   </a>
+                  <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                    <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(attachment._id); }} title="Delete attachment">Delete</button>
+                  </div>
                   <div className="gallery-meta">{attachment.fileName}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="empty-state"><h3>No attachments</h3><p>Upload an image when editing the task.</p></div>
+            <div className="empty-state" style={{ marginTop: 12 }}><h3>No attachments</h3><p>Upload an image using the button above.</p></div>
           )}
         </section>
 

@@ -48,6 +48,21 @@ export default function Tasks() {
     { value: 'critical', label: 'Critical' },
   ];
 
+  const PRIORITY_WEIGHT: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+
+  const sortTasksByPriority = (list: any[]) => {
+    return list.slice().sort((a: any, b: any) => {
+      const wa = PRIORITY_WEIGHT[a.priority] || 0;
+      const wb = PRIORITY_WEIGHT[b.priority] || 0;
+      // higher weight should come first
+      if (wa !== wb) return wb - wa;
+      // fallback to deadline asc
+      const da = a.deadline ? new Date(a.deadline).getTime() : 0;
+      const db = b.deadline ? new Date(b.deadline).getTime() : 0;
+      return da - db;
+    });
+  };
+
   const buildQuery = (search: string, status: string, priority: string) => {
     const params = new URLSearchParams();
     if (search) params.set('q', search);
@@ -66,7 +81,7 @@ export default function Tasks() {
           ...(priority ? { priority } : {}),
         },
       });
-      setTasks(response.data.data);
+      setTasks(sortTasksByPriority(response.data.data));
     } catch (error) {
       console.error('Failed to load tasks', error);
       alert('Unable to load tasks. Please try again.');
@@ -81,6 +96,14 @@ export default function Tasks() {
     load(querySearch, queryStatus, queryPriority);
     api.get('/projects').then(r => setProjects(r.data.data)).catch(() => {});
     api.get('/users').then(r => setUsers(r.data.data)).catch(() => {});
+  }, [querySearch, queryStatus, queryPriority]);
+
+  // Lightweight polling to keep list in sync across tabs (every 10s)
+  useEffect(() => {
+    const id = setInterval(() => {
+      load(querySearch, queryStatus, queryPriority);
+    }, 10000);
+    return () => clearInterval(id);
   }, [querySearch, queryStatus, queryPriority]);
 
   const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -114,19 +137,29 @@ export default function Tasks() {
     try {
       const response = await api.post('/tasks', form);
       const created = response.data.data;
-
-      if (attachmentFile) {
-        await uploadAttachment(created._id, attachmentFile);
-      }
-
-      setStatusFilter('');
-      setPriorityFilter('');
-      await load('', '', '');
-      navigate('/tasks');
+      // Optimistic UI: show the new task immediately so list updates feel instant
+      setTasks(prev => sortTasksByPriority([created, ...prev]));
       addNotification('Task created', `Created task '${created.title}'`);
       setShowModal(false);
+      const fileForUpload = attachmentFile;
       setAttachmentFile(null);
       setForm({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: getToday() });
+      // Upload attachment in background to avoid blocking UI
+      if (fileForUpload) {
+        uploadAttachment(created._id, fileForUpload).then(() => {
+          addNotification('Attachment uploaded', `Uploaded ${fileForUpload.name}`);
+          // refresh the task list to include newly added attachment
+          load('', '', '');
+        }).catch(err => {
+          console.error('Background attachment upload failed', err);
+          addNotification('Attachment upload failed', `Failed to upload ${fileForUpload.name}`);
+          load('', '', '');
+        });
+      }
+      // ensure list is refreshed shortly
+      setStatusFilter('');
+      setPriorityFilter('');
+      setTimeout(() => load('', '', ''), 500);
     } catch (error) {
       console.error('Task creation failed', error);
       alert('Unable to create task. Please try again.');
@@ -136,27 +169,36 @@ export default function Tasks() {
   };
 
   const updateStatus = async (id: string, status: string) => {
+    const prevTasks = tasks;
+    // optimistic update
+    setTasks(prev => prev.map(task => task._id === id ? { ...task, status } : task));
     try {
       const response = await api.put(`/tasks/${id}`, { status });
+      // replace with server response for consistency
       setTasks(prev => prev.map(task => task._id === id ? response.data.data : task));
-      const task = tasks.find((task) => task._id === id);
+      const task = response.data.data;
       addNotification('Task updated', `Status changed for '${task?.title || 'task'}'`);
     } catch (error) {
       console.error('Status update failed', error);
+      // revert
+      setTasks(prevTasks);
       alert('Unable to update task status. Please try again.');
     }
   };
 
   const deleteTask = async (id: string) => {
     if (!confirm('Delete this task?')) return;
-
+    const prevTasks = tasks;
+    const taskToDelete = tasks.find((task) => task._id === id);
+    // Optimistic remove
+    setTasks(prev => prev.filter(task => task._id !== id));
+    addNotification('Task deleted', `Deleted task '${taskToDelete?.title || 'task'}'`);
     try {
-      const taskToDelete = tasks.find((task) => task._id === id);
       await api.delete(`/tasks/${id}`);
-      setTasks(prev => prev.filter(task => task._id !== id));
-      addNotification('Task deleted', `Deleted task '${taskToDelete?.title || 'task'}'`);
     } catch (error) {
       console.error('Delete task failed', error);
+      // revert
+      setTasks(prevTasks);
       alert('Unable to delete task. Please try again.');
     }
   };

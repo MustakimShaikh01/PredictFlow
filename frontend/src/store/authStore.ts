@@ -67,5 +67,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       ],
     }));
   },
+  removeNotification: (id: string) => set((state) => ({ notifications: state.notifications.filter(n => n.id !== id) })),
 
   clearNotifications: () => set({ notifications: [] }),}));

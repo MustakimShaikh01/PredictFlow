@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import {
   LayoutDashboard, ListTodo, Columns3, FolderKanban, Users, BarChart3,
@@ -17,11 +17,14 @@ const navItems = [
 ];
 
 export default function Layout() {
-  const { user, logout, notifications, clearNotifications } = useAuthStore();
+  const { user, logout, notifications, clearNotifications, removeNotification } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [searchCollapsed, setSearchCollapsed] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const searchDebounceRef = useRef<number | null>(null);
   const pageTitle = navItems.find(n => location.pathname === n.to || location.pathname.startsWith(`${n.to}/`))?.label || 'Dashboard';
 
   useEffect(() => {
@@ -29,8 +32,33 @@ export default function Layout() {
     setSearch(query);
   }, [location.search]);
 
+  // Debounce search input and auto-submit after typing stops
+  useEffect(() => {
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => {
+      const q = search.trim();
+      navigate(`/tasks${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+    }, 600);
+    return () => { if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current); };
+  }, [search]);
+
+  // Close notifications dropdown on route change
+  useEffect(() => { setShowNotifications(false); }, [location.pathname]);
+
+  // Close notifications on outside click
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!dropdownRef.current) return;
+      if (dropdownRef.current.contains(e.target as Node)) return;
+      setShowNotifications(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
   const handleSearch = () => {
-    navigate(`/tasks${search ? `?q=${encodeURIComponent(search)}` : ''}`);
+    const q = search.trim();
+    navigate(`/tasks${q ? `?q=${encodeURIComponent(q)}` : ''}`);
   };
 
   const toggleNotifications = () => {
@@ -76,7 +104,10 @@ export default function Layout() {
         <header className="topbar">
           <h1 className="topbar-title">{pageTitle}</h1>
           <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="search-box">
+          <button className="btn-ghost search-toggle" onClick={() => setSearchCollapsed(s => !s)} style={{ marginRight: 8 }} aria-label="Toggle search">
+            <Search size={18} />
+          </button>
+          <div className="search-box" style={{ display: (searchCollapsed || window.innerWidth > 768) ? 'flex' : 'none' }}>
             <input
               type="search"
               value={search}
@@ -88,11 +119,11 @@ export default function Layout() {
             <button className="btn-ghost btn-icon" onClick={handleSearch}><Search size={18} /></button>
           </div>
 
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={dropdownRef}>
             <button className="btn-ghost btn-icon" onClick={toggleNotifications} style={{ position: 'relative' }}>
               <Bell size={18} />
               {unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, background: '#ef4444', borderRadius: '50%', border: '2px solid #fff' }} />
+                <span className={`unread-badge`} />
               )}
             </button>
             {showNotifications && (
@@ -105,7 +136,7 @@ export default function Layout() {
                   <div className="notification-empty">No notifications</div>
                 ) : (
                   notifications.map((note) => (
-                    <div key={note.id} className="notification-item">
+                    <div key={note.id} className="notification-item" onClick={() => removeNotification(note.id)} style={{ cursor: 'pointer' }}>
                       <strong>{note.title}</strong>
                       <div>{note.message}</div>
                       <span>{new Date(note.createdAt).toLocaleTimeString()}</span>
