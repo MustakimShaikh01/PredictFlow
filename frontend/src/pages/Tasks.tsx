@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { Plus, Edit3, Trash2, MessageSquare, Clock, User } from 'lucide-react';
+import { Plus, Trash2, Clock, User, ImagePlus } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
 const STATUS_BADGES: Record<string, string> = { 'todo': 'badge-gray', 'in-progress': 'badge-blue', 'review': 'badge-yellow', 'completed': 'badge-green' };
@@ -17,6 +17,10 @@ export default function Tasks() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentTaskId = useRef<string | null>(null);
   const getToday = () => new Date().toISOString().split('T')[0];
   const [form, setForm] = useState({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: getToday() });
   const [projects, setProjects] = useState<any[]>([]);
@@ -71,13 +75,28 @@ export default function Tasks() {
   };
 
   useEffect(() => {
-    setSearchTerm(querySearch);
     setStatusFilter(queryStatus);
     setPriorityFilter(queryPriority);
     load(querySearch, queryStatus, queryPriority);
     api.get('/projects').then(r => setProjects(r.data.data)).catch(() => {});
     api.get('/users').then(r => setUsers(r.data.data)).catch(() => {});
   }, [querySearch, queryStatus, queryPriority]);
+
+  const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject('Unable to read file');
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const uploadAttachment = async (taskId: string, file: File) => {
+    const fileUrl = await toBase64(file);
+    await api.post(`/tasks/${taskId}/attachments`, {
+      fileName: file.name,
+      fileUrl,
+      fileSize: file.size,
+    });
+  };
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,9 +108,16 @@ export default function Tasks() {
     setSubmitting(true);
     try {
       const response = await api.post('/tasks', form);
-      setTasks(prev => [...prev, response.data.data]);
-      addNotification('Task created', `Created task '${response.data.data.title}'`);
+      const created = response.data.data;
+
+      if (attachmentFile) {
+        await uploadAttachment(created._id, attachmentFile);
+      }
+
+      await load(querySearch, queryStatus, queryPriority);
+      addNotification('Task created', `Created task '${created.title}'`);
       setShowModal(false);
+      setAttachmentFile(null);
       setForm({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: getToday() });
     } catch (error) {
       console.error('Task creation failed', error);
@@ -124,6 +150,33 @@ export default function Tasks() {
     } catch (error) {
       console.error('Delete task failed', error);
       alert('Unable to delete task. Please try again.');
+    }
+  };
+
+  const handleAttachmentSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !attachmentTaskId.current) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file.');
+      return;
+    }
+    if (file.size > 5_000_000) {
+      alert('Please choose an image smaller than 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      await uploadAttachment(attachmentTaskId.current, file);
+      addNotification('Attachment added', `Uploaded ${file.name} to task.`);
+      await load(querySearch, queryStatus, queryPriority);
+    } catch (error) {
+      console.error('Upload failed', error);
+      alert('Unable to upload image. Please try again.');
+    } finally {
+      setUploading(false);
+      setAttachmentFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -169,6 +222,13 @@ export default function Tasks() {
       </div>
 
       <div className="card">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleAttachmentSelection}
+        />
         <div className="table-wrap">
           <table>
             <thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Priority</th><th>Status</th><th>Deadline</th><th>Actions</th></tr></thead>
@@ -187,7 +247,14 @@ export default function Tasks() {
                     </td>
                     <td style={{ fontSize:13, color:'#64748b' }}><Clock size={12} /> {t.deadline ? new Date(t.deadline).toLocaleDateString() : '—'}</td>
                     <td>
-                      <div style={{ display:'flex', gap:4 }}>
+                      <div style={{ display:'flex', gap:4, alignItems: 'center' }}>
+                        <button className="btn-ghost btn-icon" type="button" onClick={() => {
+                          attachmentTaskId.current = t._id;
+                          fileInputRef.current?.click();
+                        }} disabled={uploading} title="Upload image">
+                          <ImagePlus size={14} color="#2563eb" />
+                        </button>
+                        {t.attachments?.length ? <span className="badge badge-gray">{t.attachments.length} image</span> : null}
                         <button className="btn-ghost btn-icon" onClick={() => deleteTask(t._id)}><Trash2 size={14} color="#ef4444" /></button>
                       </div>
                     </td>
@@ -216,6 +283,10 @@ export default function Tasks() {
                     <option value="">Select user</option>{users.map((u: any) => <option key={u._id} value={u._id}>{u.name}</option>)}
                   </select>
                 </div>
+              </div>
+              <div className="form-group"><label className="form-label">Task Image (optional)</label>
+                <input type="file" accept="image/*" onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)} />
+                {attachmentFile && <div style={{ marginTop: 6, fontSize: 12, color: '#475569' }}>{attachmentFile.name}</div>}
               </div>
               <div className="form-row">
                 <div className="form-group"><label className="form-label">Priority</label>
