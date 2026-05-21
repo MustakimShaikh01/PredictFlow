@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import User from './models/User';
 import Team from './models/Team';
 import Project from './models/Project';
@@ -11,9 +12,9 @@ export const seedDB = async () => {
     const projectCount = await Project.countDocuments();
     const taskCount = await Task.countDocuments();
 
-    if (userCount >= 20 && projectCount >= 5 && taskCount >= 10) {
-      console.log('✅ Database already contains sufficient data. Skipping seeding.');
-      return;
+    if (false) {
+    console.log('✅ Database already contains sufficient data. Skipping seeding.');
+    return;
     }
 
     console.log('🌱 Clearing old data and seeding expanded database...');
@@ -24,10 +25,10 @@ export const seedDB = async () => {
 
     console.log('🌱 Seeding 20 Users...');
     const rawUsers = [
-      { name: 'Admin Boss', email: 'admin@example.com', role: 'admin', dpt: 'Executive', exp: 10, perf: 95, tc: 50 },
+      { name: 'Anushka Singh', email: 'anushkasinghhrana@gmail.com', role: 'admin', dpt: 'Executive', exp: 10, perf: 95, tc: 50 },
       { name: 'Sarah Manager', email: 'sarah@example.com', role: 'manager', dpt: 'Engineering', exp: 8, perf: 92, tc: 40 },
       { name: 'Mike Leader', email: 'mike@example.com', role: 'manager', dpt: 'Design', exp: 7, perf: 88, tc: 35 },
-      { name: 'Mustakim Shaikh', email: 'mustakim.shaikh.prof@gmail.com', role: 'employee', dpt: 'Engineering', exp: 5, perf: 98, tc: 25 },
+      { name: 'Urvi', email: 'urvi@example.com', role: 'employee', dpt: 'Engineering', exp: 5, perf: 98, tc: 25 },
       ...Array.from({ length: 16 }).map((_, i) => ({
         name: `Employee ${i + 1}`,
         email: `emp${i + 1}@example.com`,
@@ -39,8 +40,9 @@ export const seedDB = async () => {
       }))
     ];
 
+    const hashedPassword = await bcrypt.hash('password123', 12);
     const usersData = rawUsers.map(u => ({
-      name: u.name, email: u.email, password: 'password123', role: u.role,
+      name: u.name, email: u.email, password: hashedPassword, role: u.role,
       department: u.dpt, experience: u.exp, performanceScore: u.perf, tasksCompleted: u.tc
     }));
     
@@ -77,12 +79,12 @@ export const seedDB = async () => {
     const statuses = ['todo', 'in-progress', 'review', 'completed'];
     const priorities = ['low', 'medium', 'high', 'critical'];
 
-    // Ensure Mustakim gets at least 5 tasks across different statuses
-    const mustakim = users.find(u => u.email === 'mustakim.shaikh.prof@gmail.com')!;
+    // Ensure Admin gets at least 5 tasks across different statuses
+    const anushka = admin;
     for (let i = 0; i < 5; i++) {
       tasksData.push({
-        title: `Mustakim's Task ${i + 1}`, description: 'Important assigned work', projectId: projects[0]._id,
-        assignedTo: mustakim._id, createdBy: managerEng._id, status: statuses[i % 4], priority: priorities[i % 4],
+        title: `Anushka's Task ${i + 1}`, description: 'Important assigned work', projectId: projects[0]._id,
+        assignedTo: anushka._id, createdBy: managerEng._id, status: statuses[i % 4], priority: priorities[i % 4],
         estimatedHours: 10 + i * 2, actualHours: i === 3 ? 15 : i * 2, deadline: new Date(Date.now() + (i * 2 - 2) * 86400000)
       });
     }
