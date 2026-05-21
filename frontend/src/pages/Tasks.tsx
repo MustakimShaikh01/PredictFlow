@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { Plus, Trash2, Clock, User, ImagePlus } from 'lucide-react';
+import { Plus, Trash2, Clock, User, ImagePlus, Eye } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
 const STATUS_BADGES: Record<string, string> = { 'todo': 'badge-gray', 'in-progress': 'badge-blue', 'review': 'badge-yellow', 'completed': 'badge-green' };
@@ -99,6 +99,10 @@ export default function Tasks() {
     });
   };
 
+  const viewTaskDetail = (id: string) => {
+    navigate(`/tasks/${id}`);
+  };
+
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.deadline || form.deadline < getToday()) {
@@ -115,7 +119,10 @@ export default function Tasks() {
         await uploadAttachment(created._id, attachmentFile);
       }
 
-      await load(querySearch, queryStatus, queryPriority);
+      setStatusFilter('');
+      setPriorityFilter('');
+      await load('', '', '');
+      navigate('/tasks');
       addNotification('Task created', `Created task '${created.title}'`);
       setShowModal(false);
       setAttachmentFile(null);
@@ -246,7 +253,9 @@ export default function Tasks() {
                 tasks.map((t: any) => (
                   <tr key={t._id}>
                     <td style={{ fontWeight: 600 }}>
-                      <div>{t.title}</div>
+                      <div style={{ cursor: 'pointer' }} onClick={() => viewTaskDetail(t._id)}>
+                        {t.title}
+                      </div>
                       {t.attachments?.length ? (
                         <div className="thumbnail-row">
                           {t.attachments.slice(0, 3).map((attachment: any) => (
@@ -282,6 +291,9 @@ export default function Tasks() {
                             {t.attachments.length} image{t.attachments.length > 1 ? 's' : ''}
                           </button>
                         ) : null}
+                        <button className="btn btn-sm btn-ghost" type="button" onClick={() => viewTaskDetail(t._id)}>
+                          <Eye size={14} /> View
+                        </button>
                         <button className="btn-ghost btn-icon" onClick={() => deleteTask(t._id)}><Trash2 size={14} color="#ef4444" /></button>
                       </div>
                     </td>

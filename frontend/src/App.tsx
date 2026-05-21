@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
+import TaskDetail from './pages/TaskDetail';
 import Kanban from './pages/Kanban';
 import Projects from './pages/Projects';
 import Teams from './pages/Teams';
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="tasks" element={<Tasks />} />
+          <Route path="tasks/:taskId" element={<TaskDetail />} />
           <Route path="kanban" element={<Kanban />} />
           <Route path="projects" element={<Projects />} />
           <Route path="teams" element={<Teams />} />

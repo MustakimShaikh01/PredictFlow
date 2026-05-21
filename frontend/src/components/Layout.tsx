@@ -22,7 +22,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
-  const pageTitle = navItems.find(n => n.to === location.pathname)?.label || 'Dashboard';
+  const pageTitle = navItems.find(n => location.pathname === n.to || location.pathname.startsWith(`${n.to}/`))?.label || 'Dashboard';
 
   useEffect(() => {
     const query = new URLSearchParams(location.search).get('q') || '';
