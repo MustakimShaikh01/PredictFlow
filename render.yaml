@@ -1,0 +1,16 @@
+services:
+  - type: static_site
+    name: predictflow-frontend
+    env: static
+    branch: main
+    buildCommand: cd frontend && npm install && npm run build
+    publishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://predictflow-1.onrender.com/api
+      - key: VITE_AI_URL
+        value: https://predictflow.onrender.com
+    redirects:
+      - source: /*
+        destination: /index.html
+        type: rewrite
