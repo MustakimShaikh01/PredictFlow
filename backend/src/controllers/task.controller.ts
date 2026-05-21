@@ -22,17 +22,18 @@ const logActivity = async (taskId: string, userId: string, action: string, chang
 
 export const createTask = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const task = await Task.create({ 
-      ...req.body, 
+    const task = await Task.create({
+      ...req.body,
       createdBy: req.user!._id,
-      watchers: [req.user!._id], // Creator is a watcher by default
+      watchers: [req.user!._id],
     });
-    
-    await logActivity(task._id.toString(), req.user!._id.toString(), 'created', { task });
-    
-    const assignee = await User.findById(task.assignedTo);
-    if (assignee) await sendTaskAssignedEmail(assignee.email, assignee.name, task.title);
+    // Respond immediately — don't block on email or activity log
     res.status(201).json({ success: true, data: task });
+    // Fire-and-forget side effects
+    logActivity(task._id.toString(), req.user!._id.toString(), 'created', {}).catch(() => {});
+    User.findById(task.assignedTo).then(assignee => {
+      if (assignee) sendTaskAssignedEmail(assignee.email, assignee.name, task.title).catch(() => {});
+    }).catch(() => {});
   } catch (err: any) { res.status(400).json({ message: err.message }); }
 };
 
@@ -60,14 +61,14 @@ export const getTasks = async (req: AuthRequest, res: Response): Promise<void> =
     const sortBy = req.query.sortBy || 'deadline';
     const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
 
+    // Lean list: only fields needed for the table view
     const tasks = await Task.find(filter)
-      .populate('assignedTo', 'name email avatar')
-      .populate('createdBy', 'name')
+      .populate('assignedTo', 'name avatar')
       .populate('projectId', 'title')
-      .populate('watchers', 'name')
-      .populate('comments.user', 'name avatar')
-      .sort({ [sortBy as string]: sortOrder });
-    
+      .select('title status priority deadline progress estimatedHours assignedTo projectId createdAt')
+      .sort({ [sortBy as string]: sortOrder })
+      .lean();
+
     res.json({ success: true, data: tasks });
   } catch (err: any) { res.status(400).json({ message: err.message }); }
 };

@@ -37,9 +37,20 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: 'Too many requests' });
+// Rate limiting — generous for app usage
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  skip: (req) => req.method === 'OPTIONS',
+  message: 'Too many requests',
+});
 app.use('/api/', limiter);
+
+// Light cache hint for GET list routes
+app.use('/api/tasks', (req, res, next) => {
+  if (req.method === 'GET') res.setHeader('Cache-Control', 'private, max-age=10');
+  next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
