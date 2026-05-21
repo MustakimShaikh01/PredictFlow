@@ -24,11 +24,16 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 const allowedOrigins = [
   process.env.CLIENT_URL || 'https://predictflow-3.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
 ].filter(Boolean) as string[];
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) return callback(null, true);
       return callback(new Error('CORS policy does not allow this origin'), false);
     },
     credentials: true,

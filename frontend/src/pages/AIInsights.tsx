@@ -193,7 +193,10 @@ export default function AIInsights() {
         {/* INPUT PANEL */}
         <div className="card" style={{ padding: 24, background: '#ffffff', borderRadius: 16, border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
-            {tabs.find(t => t.id === tab)?.icon({ size: 22, color: tabs.find(t => t.id === tab)?.color })}
+            {(() => {
+              const TabIcon = tabs.find(t => t.id === tab)?.icon;
+              return TabIcon ? <TabIcon size={22} color={tabs.find(t => t.id === tab)?.color} /> : null;
+            })()}
             <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
               {tab === 'predict' && 'Completion Predictor'}
               {tab === 'team' && 'Smart Team Constellation'}
