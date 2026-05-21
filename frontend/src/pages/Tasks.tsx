@@ -1,50 +1,111 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Plus, Edit3, Trash2, MessageSquare, Clock, User } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 const STATUS_BADGES: Record<string, string> = { 'todo': 'badge-gray', 'in-progress': 'badge-blue', 'review': 'badge-yellow', 'completed': 'badge-green' };
 const PRIORITY_BADGES: Record<string, string> = { 'low': 'badge-gray', 'medium': 'badge-blue', 'high': 'badge-yellow', 'critical': 'badge-red' };
 
 export default function Tasks() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { addNotification } = useAuthStore();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: '' });
   const [projects, setProjects] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
 
-  const load = () => { api.get('/tasks').then(r => { setTasks(r.data.data); setLoading(false); }); };
+  const querySearch = new URLSearchParams(location.search).get('q') || '';
+
+  const load = async (search = '') => {
+    setLoading(true);
+    try {
+      const response = await api.get('/tasks', {
+        params: search ? { search } : {},
+      });
+      setTasks(response.data.data);
+    } catch (error) {
+      console.error('Failed to load tasks', error);
+      alert('Unable to load tasks. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    load();
+    setSearchTerm(querySearch);
+    load(querySearch);
     api.get('/projects').then(r => setProjects(r.data.data)).catch(() => {});
     api.get('/users').then(r => setUsers(r.data.data)).catch(() => {});
-  }, []);
+  }, [querySearch]);
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.post('/tasks', form);
-    setShowModal(false);
-    setForm({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: '' });
-    load();
+    try {
+      const response = await api.post('/tasks', form);
+      setTasks(prev => [...prev, response.data.data]);
+      addNotification('Task created', `Created task '${response.data.data.title}'`);
+      setShowModal(false);
+      setForm({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: '' });
+    } catch (error) {
+      console.error('Task creation failed', error);
+      alert('Unable to create task. Please try again.');
+    }
   };
 
   const updateStatus = async (id: string, status: string) => {
-    await api.put(`/tasks/${id}`, { status });
-    load();
+    try {
+      const response = await api.put(`/tasks/${id}`, { status });
+      setTasks(prev => prev.map(task => task._id === id ? response.data.data : task));
+      const task = tasks.find((task) => task._id === id);
+      addNotification('Task updated', `Status changed for '${task?.title || 'task'}'`);
+    } catch (error) {
+      console.error('Status update failed', error);
+      alert('Unable to update task status. Please try again.');
+    }
   };
 
   const deleteTask = async (id: string) => {
-    if (confirm('Delete this task?')) { await api.delete(`/tasks/${id}`); load(); }
+    if (!confirm('Delete this task?')) return;
+
+    try {
+      const taskToDelete = tasks.find((task) => task._id === id);
+      await api.delete(`/tasks/${id}`);
+      setTasks(prev => prev.filter(task => task._id !== id));
+      addNotification('Task deleted', `Deleted task '${taskToDelete?.title || 'task'}'`);
+    } catch (error) {
+      console.error('Delete task failed', error);
+      alert('Unable to delete task. Please try again.');
+    }
   };
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><span className="loading-spinner" /></div>;
 
   return (
     <>
-      <div className="page-header">
-        <div><h2 className="page-title">Tasks</h2><p className="page-subtitle">{tasks.length} total tasks</p></div>
-        <button id="add-task-btn" className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={16} /> New Task</button>
+      <div className="page-header" style={{ gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 className="page-title">Tasks</h2>
+          <p className="page-subtitle">{tasks.length} total tasks</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="search"
+            placeholder="Search tasks..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && navigate(`/tasks${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}
+            style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', minWidth: 240 }}
+          />
+          <button className="btn btn-secondary" type="button" onClick={() => navigate(`/tasks${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}>
+            Search
+          </button>
+          <button id="add-task-btn" className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={16} /> New Task</button>
+        </div>
       </div>
 
       <div className="card">

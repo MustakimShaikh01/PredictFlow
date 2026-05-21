@@ -47,6 +47,16 @@ export const getTasks = async (req: AuthRequest, res: Response): Promise<void> =
     if (req.query.labels) filter.labels = { $in: (req.query.labels as string).split(',') };
     if (req.user!.role === 'employee') filter.assignedTo = req.user!._id;
 
+    if (req.query.search) {
+      const search = req.query.search as string;
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { 'subtasks.title': { $regex: search, $options: 'i' } },
+        { labels: { $regex: search, $options: 'i' } },
+      ];
+    }
+
     const sortBy = req.query.sortBy || 'deadline';
     const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
 

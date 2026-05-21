@@ -1,4 +1,5 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import {
   LayoutDashboard, ListTodo, Columns3, FolderKanban, Users, BarChart3,
@@ -16,9 +17,27 @@ const navItems = [
 ];
 
 export default function Layout() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, notifications, clearNotifications } = useAuthStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const [showNotifications, setShowNotifications] = useState(false);
   const pageTitle = navItems.find(n => n.to === location.pathname)?.label || 'Dashboard';
+
+  useEffect(() => {
+    const query = new URLSearchParams(location.search).get('q') || '';
+    setSearch(query);
+  }, [location.search]);
+
+  const handleSearch = () => {
+    navigate(`/tasks${search ? `?q=${encodeURIComponent(search)}` : ''}`);
+  };
+
+  const toggleNotifications = () => {
+    setShowNotifications(!showNotifications);
+  };
+
+  const unreadCount = notifications.length;
 
   return (
     <div className="app-layout">
@@ -56,13 +75,47 @@ export default function Layout() {
       <main className="main-content">
         <header className="topbar">
           <h1 className="topbar-title">{pageTitle}</h1>
-          <div className="topbar-actions">
-            <button className="btn-ghost btn-icon"><Search size={18} /></button>
-            <button className="btn-ghost btn-icon" style={{ position: 'relative' }}>
-              <Bell size={18} />
-              <span style={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, background: '#ef4444', borderRadius: '50%', border: '2px solid #fff' }} />
-            </button>
+          <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="search-box">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="Search tasks..."
+              aria-label="Search tasks"
+            />
+            <button className="btn-ghost btn-icon" onClick={handleSearch}><Search size={18} /></button>
           </div>
+
+          <div style={{ position: 'relative' }}>
+            <button className="btn-ghost btn-icon" onClick={toggleNotifications} style={{ position: 'relative' }}>
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, background: '#ef4444', borderRadius: '50%', border: '2px solid #fff' }} />
+              )}
+            </button>
+            {showNotifications && (
+              <div className="notifications-dropdown">
+                <div className="notifications-header">
+                  <span>Notifications</span>
+                  <button className="btn-ghost" onClick={() => clearNotifications()}>Clear</button>
+                </div>
+                {notifications.length === 0 ? (
+                  <div className="notification-empty">No notifications</div>
+                ) : (
+                  notifications.map((note) => (
+                    <div key={note.id} className="notification-item">
+                      <strong>{note.title}</strong>
+                      <div>{note.message}</div>
+                      <span>{new Date(note.createdAt).toLocaleTimeString()}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
         </header>
         <div className="page">
           <Outlet />

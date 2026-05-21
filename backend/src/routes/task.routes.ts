@@ -37,7 +37,7 @@ router.get('/priority/:priority', getTasksByPriority);
 router.get('/complexity/:complexity', getTasksByComplexity);
 router.get('/:id', getTaskById);
 router.put('/:id', updateTask);
-router.delete('/:id', authorize('admin', 'manager'), deleteTask);
+router.delete('/:id', deleteTask);
 
 // ──────────────── COMMENTS & ACTIVITY ────────────────
 router.post('/:id/comments', addComment);
