@@ -1,10 +1,13 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: 'http://localhost:5001/api' });
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const api = axios.create({ baseURL: apiBaseUrl });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 
@@ -15,10 +18,12 @@ api.interceptors.response.use(
       const refresh = localStorage.getItem('refreshToken');
       if (refresh) {
         try {
-          const { data } = await axios.post('/api/auth/refresh', { refreshToken: refresh });
+          const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken: refresh });
           localStorage.setItem('token', data.token);
-          err.config.headers.Authorization = `Bearer ${data.token}`;
-          return axios(err.config);
+          if (err.config.headers) {
+            err.config.headers.Authorization = `Bearer ${data.token}`;
+          }
+          return axios({ ...err.config, baseURL: apiBaseUrl });
         } catch {
           localStorage.clear();
           window.location.href = '/login';
