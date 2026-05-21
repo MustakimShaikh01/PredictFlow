@@ -158,7 +158,9 @@ export const updateSubtask = async (req: AuthRequest, res: Response): Promise<vo
     const task = await Task.findById(req.params.id);
     if (!task) { res.status(404).json({ message: 'Task not found' }); return; }
 
-    const subtask = task.subtasks.id(subtaskId);
+    const subtask = task.subtasks.find(
+      (subtask) => subtask._id?.toString() === subtaskId
+    );
     if (!subtask) { res.status(404).json({ message: 'Subtask not found' }); return; }
 
     if (title) subtask.title = title;

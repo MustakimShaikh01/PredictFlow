@@ -4,7 +4,7 @@ import axios from 'axios';
 import Task from '../models/Task';
 import User from '../models/User';
 
-const AI_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+const AI_URL = process.env.AI_SERVICE_URL || 'https://predictflow.onrender.com';
 
 // Predict task completion days using AI service (with fallback)
 export const predictCompletion = async (req: AuthRequest, res: Response): Promise<void> => {

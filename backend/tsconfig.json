@@ -4,9 +4,12 @@
 
     "module": "commonjs",
 
+    "moduleResolution": "node",
+
     "lib": ["ES2020"],
 
     "outDir": "./dist",
+
     "rootDir": "./src",
 
     "strict": false,
@@ -20,13 +23,12 @@
     "resolveJsonModule": true,
 
     "declaration": true,
+
     "declarationMap": true,
 
     "sourceMap": true,
 
-    "moduleResolution": "node",
-
-    "types": ["node", "jest"]
+    "types": ["node"]
   },
 
   "include": ["src/**/*"],

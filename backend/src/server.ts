@@ -23,11 +23,7 @@ const PORT = process.env.PORT || 5000;
 // Security middleware
 app.use(helmet());
 const allowedOrigins = [
-  process.env.CLIENT_URL,
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
+  process.env.CLIENT_URL || 'https://predictflow-2.onrender.com',
 ].filter(Boolean) as string[];
 app.use(
   cors({
