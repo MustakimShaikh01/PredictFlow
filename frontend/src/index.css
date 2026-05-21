@@ -143,9 +143,13 @@ input:focus, textarea:focus, select:focus {
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 
 .page { padding: 28px; }
-.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
 .page-title { font-size: 22px; font-weight: 700; color: var(--gray-800); }
 .page-subtitle { font-size: 13px; color: var(--gray-500); margin-top: 2px; }
+.task-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.filter-row select { min-width: 160px; max-width: 200px; }
+.subtitle-note { margin-top: 8px; font-size: 13px; color: var(--gray-500); }
 
 /* ── Cards ── */
 .card {

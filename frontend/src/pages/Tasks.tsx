@@ -14,18 +14,52 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [form, setForm] = useState({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: '' });
+  const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const getToday = () => new Date().toISOString().split('T')[0];
+  const [form, setForm] = useState({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: getToday() });
   const [projects, setProjects] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
 
-  const querySearch = new URLSearchParams(location.search).get('q') || '';
+  const queryParams = new URLSearchParams(location.search);
+  const querySearch = queryParams.get('q') || '';
+  const queryStatus = queryParams.get('status') || '';
+  const queryPriority = queryParams.get('priority') || '';
 
-  const load = async (search = '') => {
+  const statusOptions = [
+    { value: '', label: 'All statuses' },
+    { value: 'todo', label: 'Todo' },
+    { value: 'in-progress', label: 'In Progress' },
+    { value: 'review', label: 'Review' },
+    { value: 'completed', label: 'Completed' },
+  ];
+
+  const priorityOptions = [
+    { value: '', label: 'All priorities' },
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical' },
+  ];
+
+  const buildQuery = (search: string, status: string, priority: string) => {
+    const params = new URLSearchParams();
+    if (search) params.set('q', search);
+    if (status) params.set('status', status);
+    if (priority) params.set('priority', priority);
+    return params.toString();
+  };
+
+  const load = async (search = '', status = '', priority = '') => {
     setLoading(true);
     try {
       const response = await api.get('/tasks', {
-        params: search ? { search } : {},
+        params: {
+          ...(search ? { search } : {}),
+          ...(status ? { status } : {}),
+          ...(priority ? { priority } : {}),
+        },
       });
       setTasks(response.data.data);
     } catch (error) {
@@ -38,22 +72,32 @@ export default function Tasks() {
 
   useEffect(() => {
     setSearchTerm(querySearch);
-    load(querySearch);
+    setStatusFilter(queryStatus);
+    setPriorityFilter(queryPriority);
+    load(querySearch, queryStatus, queryPriority);
     api.get('/projects').then(r => setProjects(r.data.data)).catch(() => {});
     api.get('/users').then(r => setUsers(r.data.data)).catch(() => {});
-  }, [querySearch]);
+  }, [querySearch, queryStatus, queryPriority]);
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.deadline || form.deadline < getToday()) {
+      alert('Deadline cannot be in the past. Please choose today or a future date.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const response = await api.post('/tasks', form);
       setTasks(prev => [...prev, response.data.data]);
       addNotification('Task created', `Created task '${response.data.data.title}'`);
       setShowModal(false);
-      setForm({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: '' });
+      setForm({ title: '', description: '', projectId: '', assignedTo: '', priority: 'medium', estimatedHours: 0, deadline: getToday() });
     } catch (error) {
       console.error('Task creation failed', error);
       alert('Unable to create task. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -91,19 +135,35 @@ export default function Tasks() {
         <div>
           <h2 className="page-title">Tasks</h2>
           <p className="page-subtitle">{tasks.length} total tasks</p>
+          {querySearch && <div className="subtitle-note">Showing results for “{querySearch}”</div>}
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            type="search"
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && navigate(`/tasks${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}
-            style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', minWidth: 240 }}
-          />
-          <button className="btn btn-secondary" type="button" onClick={() => navigate(`/tasks${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}>
-            Search
-          </button>
+        <div className="task-controls">
+          <div className="filter-row">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+              {priorityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => navigate(`/tasks?${buildQuery(querySearch, statusFilter, priorityFilter)}`)}
+            >
+              Apply filters
+            </button>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => {
+                setStatusFilter('');
+                setPriorityFilter('');
+                navigate(querySearch ? `/tasks?q=${encodeURIComponent(querySearch)}` : '/tasks');
+              }}
+            >
+              Reset filters
+            </button>
+          </div>
           <button id="add-task-btn" className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={16} /> New Task</button>
         </div>
       </div>
@@ -167,8 +227,10 @@ export default function Tasks() {
                   <input type="number" min={0} value={form.estimatedHours} onChange={e => setForm({...form, estimatedHours: +e.target.value})} />
                 </div>
               </div>
-              <div className="form-group"><label className="form-label">Deadline</label><input type="date" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} required /></div>
-              <button className="btn btn-primary" type="submit" style={{ width:'100%', justifyContent:'center' }}>Create Task</button>
+              <div className="form-group"><label className="form-label">Deadline</label><input type="date" min={getToday()} value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} required /></div>
+              <button className="btn btn-primary" type="submit" style={{ width:'100%', justifyContent:'center' }} disabled={submitting}>
+                {submitting ? 'Creating…' : 'Create Task'}
+              </button>
             </form>
           </div>
         </div>
